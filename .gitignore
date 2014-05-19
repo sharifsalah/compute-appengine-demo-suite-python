@@ -38,3 +38,6 @@ nosetests.xml
 temp_download/
 
 client_secrets.json
+
+#PyCharm files
+.idea/
