@@ -1,0 +1,4 @@
+handlers:
+
+- url: /compute-lab.*
+  script: demos.compute-lab.main.app

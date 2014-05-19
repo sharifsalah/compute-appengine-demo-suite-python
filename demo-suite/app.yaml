@@ -6,6 +6,7 @@ threadsafe: true
 
 includes:
 - demos/quick-start/app.yaml
+- demos/compute-lab/app.yaml
 
 handlers:
 - url: /css

@@ -560,7 +560,7 @@ class Instance(GceResource):
     zone: An object of type Zone representing the instance's zone.
     description: A string description of the instance.
     tags: A list of string tags for the instance.
-    image: An object of type Image representing the instance's image.
+    # image: An object of type Image representing the instance's image.
     machine_type: An object of type MachineType representing the instance's
         machine type.
     network_interfaces: A list of dictionaries representing the instance's

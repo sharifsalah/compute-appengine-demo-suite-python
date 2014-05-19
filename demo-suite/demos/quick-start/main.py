@@ -56,7 +56,7 @@ def getObjective(project_id):
   key = ndb.Key("Objective", project_id)
   return key.get()
 
-@ndb.transactional
+@ndb.transactional #either fails or succeeds completely.
 def updateObjective(project_id, targetVMs):
   objective = getObjective(project_id)
   if not objective: 
@@ -87,6 +87,7 @@ class QuickStart(webapp2.RequestHandler):
   def get(self):
     """Displays the main page for the Quick Start demo. Auth required."""
 
+    #if no valid refresh token for scope set in oauth.py then redirect to authorise_url
     if not oauth_decorator.credentials.refresh_token:
       self.redirect(oauth_decorator.authorize_url() + '&approval_prompt=force')
 
