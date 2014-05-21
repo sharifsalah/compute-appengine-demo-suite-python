@@ -8,10 +8,14 @@
 
 {% block content %}
     <h1>
-      Hello, World.
+      Start a new lab.
     </h1>
 
    <form role="form" action="/compute-lab/new" method="post" >
+      <div class="form-group">
+	    <label for="lab-name">Name of Lab</label>
+	    <input type="text" class="form-control" name="lab-name" placeholder="">
+	  </div>
 	  <div class="form-group">
 	    <label for="project-id">Project ID</label>
 	    <input type="text" class="form-control" name="project-id" placeholder="">
@@ -27,6 +31,10 @@
       <div class="form-group">
 	    <label for="machine-type">Machine Type</label>
 	    <input type="text" class="form-control" name="machine-type" placeholder="">
+	  </div>
+      <div class="form-group">
+	    <label for="total-students">Number of Students</label>
+	    <input type="number" class="form-control" name="total-students" placeholder="">
 	  </div>
 
 	  <button type="submit" class="btn btn-default">Submit</button>
