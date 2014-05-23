@@ -4,13 +4,55 @@
 {% endblock %}
 
 {% block extra_javascript %}
+    <script type="text/javascript">
+        function getInstanceData(){
+            $.ajax({
+                type: "POST",
+                url: "/compute-lab/get-status",
+                dataType: 'json',
+                data: JSON.stringify({ "lab_id": {{lab_id}}})
+                })
+            .done(function( data ) {
+                var content = '';
+                for(var i=0; i<data.length; i++){
+                    content += '<tr>';
+                    content += '<td>'+data[i].name+'</td>';
+                    content += '<td>'+data[i].state+'</td>';
+                    content += '</tr>';
+                }
+                $('#instance-table tbody').html(content);
+                });
+        };
+
+        $( document ).ready(function() {
+            getInstanceData();
+        });
+
+        $(function() {
+            setInterval( "getInstanceData()", 10000);
+        });
+    </script>
+
 {% endblock %}
 
 {% block content %}
+    <h1>Lab: {{lab_name}}</h1>
+    <hr>
 
-    {% for key, value in instances.iteritems() %}
-        <dt>{{ key|e }}</dt>
-        <dd>{{ value|e }}</dd>
-    {% endfor %}
+    <table class="table" id="instance-table">
+      <thead>
+        <tr>
+          <th class="col-sm-4">Instance Name</th>
+          <th class="col-sm-4">Status</th>
+          <th class="col-sm-2"></th>
+          <th class="col-sm-2"></th>
+        </tr>
+      </thead>
+        <tbody>
+
+        </tbody>
+    </table>
+
+    <a href="javascript:getInstanceData();" >Refresh</a>
 
 {% endblock %}
