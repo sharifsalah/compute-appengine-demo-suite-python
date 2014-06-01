@@ -93,6 +93,11 @@ class CreateLab(webapp2.RequestHandler):
                   lab_zone=lab_zone)
         lab.put()
 
+        # grant read access to GCS for startup script
+        scopes = [{'kind': 'compute#serviceAccount',
+                   'email': 'default',
+                   'scopes': ['https://www.googleapis.com/auth/devstorage.read_only']}]
+
         #create instance objects
         instances = []
         for n in range(number_students):
@@ -101,7 +106,8 @@ class CreateLab(webapp2.RequestHandler):
                 zone_name=lab_zone,
                 machine_type_name=machine_type,
                 network_interfaces=networks,
-                disk_mounts=disks))
+                disk_mounts=disks,
+                service_accounts=scopes))
             instance = Instance(name="%s-%s" % (lab_name, n),
                                 lab=lab.key)
             instance.put()
