@@ -12,6 +12,7 @@ import json
 
 from google.appengine.api import users
 from google.appengine.ext import ndb
+from webapp2_extras import security
 
 jinja_environment = jinja2.Environment(loader=jinja2.FileSystemLoader(''))
 oauth_decorator = oauth.decorator
@@ -110,8 +111,8 @@ class CreateLab(webapp2.RequestHandler):
                 'value': '%s-%s' % (lab_name, n)
             },
             {
-                'key': 'foo',
-                'value': 'bar'
+                'key': 'pass',
+                'value': security.generate_random_string(length=8)
             },
             {
                 'key': 'startup-script-url',
