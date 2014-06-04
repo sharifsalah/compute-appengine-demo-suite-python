@@ -98,6 +98,8 @@ class CreateLab(webapp2.RequestHandler):
                    'email': 'default',
                    'scopes': ['https://www.googleapis.com/auth/devstorage.read_only']}]
 
+        metadata_items = [{'key': 'foo','value': 'bar'}]
+
         #create instance objects
         instances = []
         for n in range(number_students):
@@ -107,6 +109,7 @@ class CreateLab(webapp2.RequestHandler):
                 machine_type_name=machine_type,
                 network_interfaces=networks,
                 disk_mounts=disks,
+                metadata=metadata_items,
                 service_accounts=scopes))
             instance = Instance(name="%s-%s" % (lab_name, n),
                                 lab=lab.key)
