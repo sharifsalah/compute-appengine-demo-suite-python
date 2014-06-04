@@ -98,10 +98,16 @@ class CreateLab(webapp2.RequestHandler):
                    'email': 'default',
                    'scopes': ['https://www.googleapis.com/auth/devstorage.read_only']}]
 
-        metadata_items = [
+
+
+        #create instance objects
+        instances = []
+        for n in range(number_students):
+            # set the username to the name of the instance
+            metadata_items = [
             {
                 'key': 'user',
-                'value': 'joe'
+                'value': '%s-%s' % (lab_name, n)
             },
             {
                 'key': 'foo',
@@ -112,10 +118,6 @@ class CreateLab(webapp2.RequestHandler):
                 'value': 'gs://startup-scripts-compute/startup.sh'
             }
         ]
-
-        #create instance objects
-        instances = []
-        for n in range(number_students):
             instances.append(gce.Instance(
                 name="%s-%s" % (lab_name, n),
                 zone_name=lab_zone,
