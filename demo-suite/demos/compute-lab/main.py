@@ -98,7 +98,20 @@ class CreateLab(webapp2.RequestHandler):
                    'email': 'default',
                    'scopes': ['https://www.googleapis.com/auth/devstorage.read_only']}]
 
-        metadata_items = [{'key': 'foo','value': 'bar'}]
+        metadata_items = [
+            {
+                'key': 'user',
+                'value': 'joe'
+            },
+            {
+                'key': 'foo',
+                'value': 'bar'
+            },
+            {
+                'key': 'startup-script-url',
+                'value': 'gs://startup-scripts-compute/startup.sh'
+            }
+        ]
 
         #create instance objects
         instances = []
