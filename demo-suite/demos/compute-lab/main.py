@@ -10,9 +10,11 @@ import webapp2
 import oauth2client.appengine as oauth2client
 import json
 
+from google.appengine.api import memcache
 from google.appengine.api import users
 from google.appengine.ext import ndb
 from webapp2_extras import security
+
 
 jinja_environment = jinja2.Environment(loader=jinja2.FileSystemLoader(''))
 oauth_decorator = oauth.decorator
@@ -104,15 +106,21 @@ class CreateLab(webapp2.RequestHandler):
         #create instance objects
         instances = []
         for n in range(number_students):
+
             # set the username to the name of the instance
+            username = '%s-%s' % (lab_name, n)
+            pass_phrase = security.generate_random_string(length=8)
+            if not memcache.add(username, pass_phrase):
+                  logging.error('Failed to set memcache')
+
             metadata_items = [
             {
                 'key': 'user',
-                'value': '%s-%s' % (lab_name, n)
+                'value': username
             },
             {
                 'key': 'pass',
-                'value': security.generate_random_string(length=8)
+                'value': pass_phrase
             },
             {
                 'key': 'startup-script-url',
@@ -192,12 +200,17 @@ class GetInstanceStatus(webapp2.RequestHandler):
         instance_list = []
         for n in range(len(query)):
             instance_name = query[n].name
+            pass_phrase = memcache.get(instance_name)
+            if pass_phrase is not None:
+                logging.debug("Did read from memcache!")
             if instance_name in status_dict:
                 instance_state = status_dict[query[n].name]
             else:
                 instance_state = "NOT RUNNING"
-            instance_list.append({"name": instance_name,
-                                  "state": instance_state})
+            instance_list.append({"address": '192.168.0.1',
+                                  "state": instance_state,
+                                  "name": instance_name,
+                                  "pass": pass_phrase})
 
         self.response.out.write(json.dumps(instance_list))
 

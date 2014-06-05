@@ -16,8 +16,11 @@
                 var content = '';
                 for(var i=0; i<data.length; i++){
                     content += '<tr>';
-                    content += '<td>'+data[i].name+'</td>';
+                    content += '<td>'+data[i].address+'</td>';
                     content += '<td>'+data[i].state+'</td>';
+                    content += '<td>'+data[i].name+'</td>';
+                    content += '<td>'+data[i].pass+'</td>';
+
                     content += '</tr>';
                 }
                 $('#instance-table tbody').html(content);
@@ -42,9 +45,10 @@
     <table class="table" id="instance-table">
       <thead>
         <tr>
-          <th class="col-sm-4">Instance Name</th>
+          <th class="col-sm-4">IP Address</th>
           <th class="col-sm-4">Status</th>
-          <th class="col-sm-2"></th>
+          <th class="col-sm-4">Instance Name</th>
+          <th class="col-sm-2">Password</th>
           <th class="col-sm-2"></th>
         </tr>
       </thead>
