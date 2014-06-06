@@ -146,7 +146,7 @@ class CreateLab(webapp2.RequestHandler):
             'Error inserting instances: ',
             resources=instances)
 
-        self.redirect('/compute-lab/%s' % lab.key.id())
+        self.redirect('/lab/%s' % lab.key.id())
 
 class LabDetails(webapp2.RequestHandler):
     """Handler for lab details page."""
@@ -217,8 +217,8 @@ class GetInstanceStatus(webapp2.RequestHandler):
 app = webapp2.WSGIApplication(
     [
         ('/', Main),
-        ('/compute-lab/new', CreateLab),
-        ('/compute-lab/(\d+)', LabDetails),
-        ('/compute-lab/get-status', GetInstanceStatus)
+        ('/lab/new', CreateLab),
+        ('/lab/(\d+)', LabDetails),
+        ('/lab/get-status', GetInstanceStatus)
     ],
     debug=True)

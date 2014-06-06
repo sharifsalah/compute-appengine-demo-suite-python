@@ -8,7 +8,7 @@
         function getInstanceData(){
             $.ajax({
                 type: "POST",
-                url: "/compute-lab/get-status",
+                url: "/lab/get-status",
                 dataType: 'json',
                 data: JSON.stringify({ "lab_id": {{lab_id}}})
                 })
