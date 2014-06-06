@@ -1,7 +1,0 @@
-A list of project to-dos:
-
-Update README
-Update non CDN bootstrap resources
-Update download_dependencies.sh for new folder mapping
-Update/remove settings.json
-Split models out of views.py
