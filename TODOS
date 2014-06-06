@@ -1,20 +1,7 @@
 A list of project to-dos:
 
-- Easier customization of app engine and compute engine project information
-  to allow for out-of-the-box deployment of the demos.
-
-- Quick start demo:
-
-  - Make sure the user can't start more instances that what are available.
-
-  - Add a legend.
-
-  - Click on boxes to show information about the instance.
-
-  - Resize squares based on the number of instances.
-
-  - Gray out reset button when clicked.
-
-  - Don't allow TERMINATED instances to add to the counter's count.
-
-  - When the page loads, show the current state of the world.
+Update README
+Update non CDN bootstrap resources
+Update download_dependencies.sh for new folder mapping
+Update/remove settings.json
+Split models out of views.py
