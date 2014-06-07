@@ -15,7 +15,6 @@ from google.appengine.api import users
 from google.appengine.ext import ndb
 from webapp2_extras import security
 
-
 jinja_environment = jinja2.Environment(loader=jinja2.FileSystemLoader(''))
 oauth_decorator = oauth.decorator
 
@@ -193,8 +192,11 @@ class GetInstanceStatus(webapp2.RequestHandler):
                                                                  # filter='name eq ^%s.*' % 'test-instance',
                                                                  maxResults='500')
         status_dict = {}
+        ip_dict = {}
         for instance in instances:
             status_dict[instance.name] = instance.status
+            if instance.status == 'RUNNING':
+                ip_dict[instance.name] = instance.network_interfaces[0][u'accessConfigs'][0]['natIP']
 
         #compare expected instances with active instances and produce list for passing to client side js function
         instance_list = []
@@ -203,11 +205,15 @@ class GetInstanceStatus(webapp2.RequestHandler):
             pass_phrase = memcache.get(instance_name)
             if pass_phrase is not None:
                 logging.debug("Did read from memcache!")
+                #TODO
             if instance_name in status_dict:
                 instance_state = status_dict[query[n].name]
             else:
                 instance_state = "NOT RUNNING"
-            instance_list.append({"address": '192.168.0.1',
+            ip_address = 'Not assigned'
+            if instance_state == 'RUNNING':
+                ip_address = ip_dict[instance.name]
+            instance_list.append({"address": ip_address,
                                   "state": instance_state,
                                   "name": instance_name,
                                   "pass": pass_phrase})
