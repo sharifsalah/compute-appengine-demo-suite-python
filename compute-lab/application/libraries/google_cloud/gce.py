@@ -173,6 +173,27 @@ class GceProject(object):
     except error.GceTokenError:
       raise
 
+  def delete(self, resource):
+    """Remove an resource from the GCE project.
+
+    Args:
+      resource: A GceResource object.
+
+    Raises:
+      GceError: Raised when API call fails.
+      GceTokenError: Raised when the access token fails to refresh.
+    """
+
+    resource.gce_project = self
+    request = self._delete_request(resource)
+
+    try:
+      self._run_request(request)
+    except error.GceError:
+      raise
+    except error.GceTokenError:
+      raise
+
   def bulk_insert(self, resources):
     """Insert multiple resources using a batch request.
 

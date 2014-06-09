@@ -167,6 +167,7 @@ class LabDetails(webapp2.RequestHandler):
 class GetInstanceStatus(webapp2.RequestHandler):
     """Handler for getting lab status"""
 
+    @oauth_decorator.oauth_required
     def post(self):
 
         #get data from request.
@@ -220,11 +221,53 @@ class GetInstanceStatus(webapp2.RequestHandler):
 
         self.response.out.write(json.dumps(instance_list))
 
+class StopInstance(webapp2.RequestHandler):
+    """Handler for stopping individual instances"""
+
+    @oauth_decorator.oauth_required
+    def post(self):
+        #get data from request.
+        data = json.loads(self.request.body)
+        lab_id = data['lab_id']
+        option = data['option']
+
+        #create lab key
+        lab_key = ndb.Key('Lab', int(lab_id))
+
+        #get lab entity from datastore
+        lab = lab_key.get()
+        project_id = lab.project_id
+        lab_zone = lab.lab_zone
+
+        gce_project = gce.GceProject(oauth_decorator.credentials, project_id=project_id, zone_name=lab_zone)
+
+        if option == 'single':
+            instance_name = data['instance_name']
+            filter_arg = instance_name
+        elif option == 'all':
+            filter_arg = '.*'
+
+        instance = gce_appengine.GceAppEngine().run_gce_request(self,
+                                                                 gce_project.list_instances,
+                                                                 'Error listing instances: ',
+                                                                 filter='name eq %s' % filter_arg,
+                                                                 maxResults='500')
+
+        if instance:
+            response = gce_appengine.GceAppEngine().run_gce_request(
+                self,
+                gce_project.bulk_delete,
+                'Error deleting instances: ',
+                resources=instance)
+
+
+
 app = webapp2.WSGIApplication(
     [
         ('/', Main),
         ('/lab/new', CreateLab),
         ('/lab/(\d+)', LabDetails),
-        ('/lab/get-status', GetInstanceStatus)
+        ('/lab/get-status', GetInstanceStatus),
+        ('/lab/stop-instance', StopInstance)
     ],
     debug=True)
