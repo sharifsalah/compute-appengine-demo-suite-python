@@ -14,22 +14,52 @@
                 })
             .done(function( data ) {
                 var content = '';
+                var labButton = true;
+                var labButtonOption = true;
                 for(var i=0; i<data.length; i++){
-                    content += '<tr>';
-                    content += '<td>'+data[i].address+'</td>';
-                    content += '<td>'+data[i].state+'</td>';
-                    content += '<td>'+data[i].name+'</td>';
-                    content += '<td>'+data[i].pass+'</td>';
+                    var state = data[i].state;
+                    var button;
+                    //var bin;
 
-                    if (data[i].state == "RUNNING") {
-                        content += '<td>'+'<a id="'+data[i].name+'_button"; title="Click to stop instance" href="#" onclick="stopInstance(&#34;'+data[i].name+'&#34;);return false;" class="btn btn-danger" >Stop Instance</a>'+'</td>';
-                    } else {
-                        content += '<td>'+'<a href="#" class="btn btn-danger disabled" >Stop Instance</a>'+'</td>';
+                    if (state == "REQUEST PENDING") {
+                        labButton = false
                     }
 
+                    if (state == "RUNNING" || state == "PROVISIONING" || state == "STAGING" || state == "ERROR STOPPING INSTANCE") {
+                        button = '<a id="'+data[i].name+'_button"; title="Click to stop instance" href="#" onclick="stopInstance(&#34;'+data[i].name+'&#34;, &#34;'+data[i].id+'&#34;);return false;" class="btn btn-danger" >Stop Instance</a>';
+                        labButtonOption = (labButtonOption & false);
+                    } else if (state == "REQUEST PENDING" || state == "STOPPING") {
+                        button = '<a href="#" class="btn btn-default disabled" >Please wait...</a>';
+                    } else if (state == "TERMINATED" || state == "ERROR STARTING INSTANCE") {
+                        button = '<a href="#" class="btn btn-success" >Start Instance</a>';
+                        labButtonOption = (labButtonOption & true);
+                    }
+
+                    content += '<tr>';
+                    content += '<td>'+data[i].address+'</td>';
+                    content += '<td>'+state+'</td>';
+                    content += '<td>'+data[i].name+'</td>';
+                    content += '<td>'+data[i].pass+'</td>';
+                    content += '<td>'+button+'</td>';
                     content += '</tr>';
                 }
                 $('#instance-table tbody').html(content);
+
+                if (labButton == false) {
+                    $('#lab-control-button').attr('class', 'btn btn-default disabled');
+                    $('#lab-control-button').attr('href', '#');
+                    $('#lab-control-button').html('Please wait...');
+                } else {
+                    if (labButtonOption == true) {
+                        $('#lab-control-button').attr('class', 'btn btn-success');
+                        $('#lab-control-button').attr('href', '#');
+                        $('#lab-control-button').html('Start lab');
+                    } else {
+                        $('#lab-control-button').attr('class', 'btn btn-danger');
+                        $('#lab-control-button').attr('href', 'javascript:stopLab();');
+                        $('#lab-control-button').html('Stop lab');
+                    }
+                }
             });
         };
 
@@ -41,8 +71,7 @@
             setInterval( "getInstanceData()", 10000);
         });
 
-        function stopInstance(instanceName){
-            console.log(instanceName+"_button");
+        function stopInstance(instanceName, instanceID){
             $('#'+instanceName+'_button').attr('disabled', true);
 
             $.ajax({
@@ -51,7 +80,8 @@
                 dataType: 'json',
                 data: JSON.stringify({ "lab_id": {{lab_id}},
                                        "option": "single",
-                                       "instance_name": instanceName})
+                                       "instance_name": instanceName,
+                                       "instance_id": instanceID})
             })
             .done(function( data ) {
                 getInstanceData();
@@ -80,8 +110,10 @@
 {% endblock %}
 
 {% block content %}
-    <h1>Lab: {{lab_name}} <a href="javascript:stopLab();" onclick="this.disabled=true" class="btn btn-danger" >Stop Lab</a></h1>
+    <h1 id="header">Lab: {{lab_name}}</h1>
     <hr>
+
+    <a href="#" id="lab-control-button" class="btn btn-default disabled" >Pending</a>
 
     <table class="table" id="instance-table">
       <thead>

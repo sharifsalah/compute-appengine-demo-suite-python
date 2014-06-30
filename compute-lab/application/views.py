@@ -9,11 +9,13 @@ import jinja2
 import webapp2
 import oauth2client.appengine as oauth2client
 import json
+from models import Lab, Instance
 
 from google.appengine.api import memcache
 from google.appengine.api import users
 from google.appengine.ext import ndb
 from webapp2_extras import security
+from datetime import datetime, timedelta
 
 jinja_environment = jinja2.Environment(loader=jinja2.FileSystemLoader(''))
 oauth_decorator = oauth.decorator
@@ -34,16 +36,6 @@ class Main(webapp2.RequestHandler):
         template = jinja_environment.get_template('application/templates/index.html')
         self.response.out.write(template.render(variables))
 
-class Lab(ndb.Model):
-    """Data model to record labs"""
-    name = ndb.StringProperty()
-    project_id = ndb.StringProperty()
-    lab_zone = ndb.StringProperty()
-
-class Instance(ndb.Model):
-    """Data model to record instances"""
-    name = ndb.StringProperty()
-    lab = ndb.KeyProperty(kind=Lab)
 
 class CreateLab(webapp2.RequestHandler):
     """Handler for starting a new lab."""
@@ -135,7 +127,9 @@ class CreateLab(webapp2.RequestHandler):
                 metadata=metadata_items,
                 service_accounts=scopes))
             instance = Instance(name="%s-%s" % (lab_name, n),
-                                lab=lab.key)
+                                lab=lab.key,
+                                desired_state="RUNNING",
+                                request_timestamp=datetime.now())
             instance.put()
 
         #send response
@@ -144,6 +138,8 @@ class CreateLab(webapp2.RequestHandler):
             gce_project.bulk_insert,
             'Error inserting instances: ',
             resources=instances)
+
+        logging.debug(response)
 
         self.redirect('/lab/%s' % lab.key.id())
 
@@ -192,6 +188,7 @@ class GetInstanceStatus(webapp2.RequestHandler):
                                                                  'Error listing instances: ',
                                                                  # filter='name eq ^%s.*' % 'test-instance',
                                                                  maxResults='500')
+
         status_dict = {}
         ip_dict = {}
         for instance in instances:
@@ -207,14 +204,37 @@ class GetInstanceStatus(webapp2.RequestHandler):
             if pass_phrase is not None:
                 logging.debug("Did read from memcache!")
                 #TODO
-            if instance_name in status_dict:
-                instance_state = status_dict[query[n].name]
-            else:
-                instance_state = "NOT RUNNING"
+
+            desired_state = query[n].desired_state
+            if desired_state == "RUNNING":
+                if instance_name in status_dict:
+                    instance_state = status_dict[query[n].name]
+                elif (datetime.now() - query[n].request_timestamp) < timedelta(seconds=120):
+                    instance_state = "REQUEST PENDING"
+                else:
+                    instance_state = "ERROR STARTING INSTANCE"
+                    ## could call start function here
+            elif desired_state == "TERMINATED":
+                if instance_name not in status_dict:
+                    instance_state = "TERMINATED"
+                elif status_dict[query[n].name] == "STOPPING":
+                    instance_state = "STOPPING"
+                elif (datetime.now() - query[n].request_timestamp) < timedelta(seconds=120):
+                    instance_state = "REQUEST PENDING"
+                else:
+                    instance_state = "ERROR STOPPING INSTANCE"
+                    ## could call stop function here
+
+            # if instance_name in status_dict:
+            #     instance_state = status_dict[query[n].name]
+            # else:
+            #     instance_state = "TERMINATED"
+
             ip_address = 'Not assigned'
             if instance_state == 'RUNNING':
                 ip_address = ip_dict[instance.name]
             instance_list.append({"address": ip_address,
+                                  "id": query[n].key.id(),
                                   "state": instance_state,
                                   "name": instance_name,
                                   "pass": pass_phrase})
@@ -243,22 +263,36 @@ class StopInstance(webapp2.RequestHandler):
 
         if option == 'single':
             instance_name = data['instance_name']
+            instance_id = data['instance_id']
             filter_arg = instance_name
+
+            #Update instance desired_state
+            instance = ndb.Key('Instance', int(instance_id)).get()
+            instance.desired_state = "TERMINATED"
+            instance.put()
+
         elif option == 'all':
             filter_arg = '.*'
+            query = Instance.query(Instance.lab == lab_key).fetch()
+            for instance in query:
+                instance.desired_state = "TERMINATED"
+                instance.request_timestamp = datetime.now()
+                instance.put()
 
-        instance = gce_appengine.GceAppEngine().run_gce_request(self,
+        instances = gce_appengine.GceAppEngine().run_gce_request(self,
                                                                  gce_project.list_instances,
                                                                  'Error listing instances: ',
                                                                  filter='name eq %s' % filter_arg,
                                                                  maxResults='500')
 
-        if instance:
+        if instances:
             response = gce_appengine.GceAppEngine().run_gce_request(
                 self,
                 gce_project.bulk_delete,
                 'Error deleting instances: ',
-                resources=instance)
+                resources=instances)
+
+
 
 
 
