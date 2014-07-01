@@ -37,8 +37,8 @@ class Main(webapp2.RequestHandler):
         self.response.out.write(template.render(variables))
 
 
-class CreateLab(webapp2.RequestHandler):
-    """Handler for starting a new lab."""
+class CreateNewLab(webapp2.RequestHandler):
+    """Handler for creating a new lab."""
 
     @oauth_decorator.oauth_required
     def get(self):
@@ -68,31 +68,13 @@ class CreateLab(webapp2.RequestHandler):
         #configure project object
         gce_project = gce.GceProject(credentials, project_id=project_id, zone_name=lab_zone)
 
-        #configure network
-        network = gce.Network('default')
-        network.gce_project = gce_project
-        networks = [{'accessConfigs': [{'type': 'ONE_TO_ONE_NAT',
-                                       'name': 'External NAT'}],
-                    'network': network.url}]
-
-        #configure disks (must be iterable list)
-        disks = [gce.DiskMount(
-            boot=True,
-            auto_delete=True,
-            init_disk_image=instance_image)]
-
         #create lab entity in datastore
         lab = Lab(name=lab_name,
                   project_id=project_id,
-                  lab_zone=lab_zone)
+                  lab_zone=lab_zone,
+                  machine_type=machine_type,
+                  instance_image=instance_image)
         lab.put()
-
-        # grant read access to GCS for startup script
-        scopes = [{'kind': 'compute#serviceAccount',
-                   'email': 'default',
-                   'scopes': ['https://www.googleapis.com/auth/devstorage.read_only']}]
-
-
 
         #create instance objects
         instances = []
@@ -117,31 +99,21 @@ class CreateLab(webapp2.RequestHandler):
                 'key': 'startup-script-url',
                 'value': 'gs://startup-scripts-compute/startup.sh'
             }
-        ]
-            instances.append(gce.Instance(
-                name="%s-%s" % (lab_name, n),
-                zone_name=lab_zone,
-                machine_type_name=machine_type,
-                network_interfaces=networks,
-                disk_mounts=disks,
-                metadata=metadata_items,
-                service_accounts=scopes))
+            ]
+
             instance = Instance(name="%s-%s" % (lab_name, n),
                                 lab=lab.key,
+                                metadata=metadata_items,
                                 desired_state="RUNNING",
                                 request_timestamp=datetime.now())
             instance.put()
 
-        #send response
-        response = gce_appengine.GceAppEngine().run_gce_request(
-            self,
-            gce_project.bulk_insert,
-            'Error inserting instances: ',
-            resources=instances)
+            instances.append(instance)
 
-        logging.debug(response)
+        start_instances(gce_project, lab, instances)
 
         self.redirect('/lab/%s' % lab.key.id())
+
 
 class LabDetails(webapp2.RequestHandler):
     """Handler for lab details page."""
@@ -159,6 +131,7 @@ class LabDetails(webapp2.RequestHandler):
 
         template = jinja_environment.get_template('application/templates/lab.html')
         self.response.out.write(template.render(variables))
+
 
 class GetInstanceStatus(webapp2.RequestHandler):
     """Handler for getting lab status"""
@@ -195,6 +168,8 @@ class GetInstanceStatus(webapp2.RequestHandler):
             status_dict[instance.name] = instance.status
             if instance.status == 'RUNNING':
                 ip_dict[instance.name] = instance.network_interfaces[0][u'accessConfigs'][0]['natIP']
+
+        logging.debug(status_dict)
 
         #compare expected instances with active instances and produce list for passing to client side js function
         instance_list = []
@@ -241,67 +216,144 @@ class GetInstanceStatus(webapp2.RequestHandler):
 
         self.response.out.write(json.dumps(instance_list))
 
-class StopInstance(webapp2.RequestHandler):
-    """Handler for stopping individual instances"""
+
+class InstanceService(webapp2.RequestHandler):
+    """Handles instance actions and calls appropriate functions"""
 
     @oauth_decorator.oauth_required
     def post(self):
         #get data from request.
         data = json.loads(self.request.body)
         lab_id = data['lab_id']
-        option = data['option']
+        target_function = data['target_function']
+        target_instances = data['target_instances']
 
         #create lab key
         lab_key = ndb.Key('Lab', int(lab_id))
 
         #get lab entity from datastore
         lab = lab_key.get()
-        project_id = lab.project_id
-        lab_zone = lab.lab_zone
 
-        gce_project = gce.GceProject(oauth_decorator.credentials, project_id=project_id, zone_name=lab_zone)
+        gce_project = gce.GceProject(oauth_decorator.credentials, project_id=lab.project_id, zone_name=lab.lab_zone)
 
-        if option == 'single':
-            instance_name = data['instance_name']
-            instance_id = data['instance_id']
-            filter_arg = instance_name
+        if target_instances == "ALL":
+            instances = Instance.query(Instance.lab == lab_key).fetch()
+        else:
+            instances = []
+            for i in target_instances:
+                try:
+                    instances.append(ndb.Key('Instance', int(i)).get())
+                except:
+                    logging.debug("Key error?")
 
-            #Update instance desired_state
-            instance = ndb.Key('Instance', int(instance_id)).get()
-            instance.desired_state = "TERMINATED"
-            instance.put()
-
-        elif option == 'all':
-            filter_arg = '.*'
-            query = Instance.query(Instance.lab == lab_key).fetch()
-            for instance in query:
-                instance.desired_state = "TERMINATED"
-                instance.request_timestamp = datetime.now()
-                instance.put()
-
-        instances = gce_appengine.GceAppEngine().run_gce_request(self,
-                                                                 gce_project.list_instances,
-                                                                 'Error listing instances: ',
-                                                                 filter='name eq %s' % filter_arg,
-                                                                 maxResults='500')
-
-        if instances:
-            response = gce_appengine.GceAppEngine().run_gce_request(
-                self,
-                gce_project.bulk_delete,
-                'Error deleting instances: ',
-                resources=instances)
+        if target_function == 'START':
+            start_instances(gce_project, lab, instances)
+        elif target_function == 'STOP':
+            stop_instances(gce_project, lab, instances)
+        elif target_function == "DELETE":
+            delete_instances(gce_project, lab, instances)
 
 
+def start_instances(gce_project, lab, instances):
+    """
+    Start an instance
 
+    :param gce_project: The string name of the project owning the resources.
+    :param lab: The lab ndb entity that the instances belong to.
+    :param instances: A list containing the instance ndb entities to be amended.
+    """
+
+    #configure generic instance arguments
+    network = gce.Network('default')
+    network.gce_project = gce_project
+    networks = [{'accessConfigs': [{'type': 'ONE_TO_ONE_NAT',
+                                   'name': 'External NAT'}],
+                'network': network.url}]
+
+    disks = [gce.DiskMount(
+        boot=True,
+        auto_delete=True,
+        init_disk_image=lab.instance_image)]
+
+    scopes = [{'kind': 'compute#serviceAccount',
+               'email': 'default',
+               'scopes': ['https://www.googleapis.com/auth/devstorage.read_only']}]
+
+    resources = []
+
+    for instance in instances:
+
+        instance.desired_state = "RUNNING"
+        instance.request_timestamp = datetime.now()
+        instance.put()
+
+        instance_object = gce.Instance(
+            name=instance.name,
+            zone_name=lab.lab_zone,
+            machine_type_name=lab.machine_type,
+            network_interfaces=networks,
+            disk_mounts=disks,
+            metadata=instance.metadata,
+            service_accounts=scopes)
+
+        resources.append(instance_object)
+
+    response = gce_appengine.GceAppEngine().run_gce_request(
+            gce_project,
+            gce_project.bulk_insert,
+            'Error inserting instances: ',
+            resources=resources)
+
+
+def stop_instances(gce_project, lab, instances):
+    """
+    Stop an instance
+
+    :param gce_project: The string name of the project owning the resources.
+    :param lab: The lab ndb entity that the instances belong to.
+    :param instances: A list containing the instance ndb entities to be amended.
+    """
+
+    resources = []
+
+    for instance in instances:
+
+        instance.desired_state = "TERMINATED"
+        instance.request_timestamp = datetime.now()
+        instance.put()
+
+        instance_object = gce.Instance(
+            name=instance.name,
+            zone_name=lab.lab_zone)
+
+        resources.append(instance_object)
+
+    response = gce_appengine.GceAppEngine().run_gce_request(
+        gce_project,
+        gce_project.bulk_delete,
+        'Error deleting instances: ',
+        resources=resources)
+
+
+def delete_instances(gce_project, lab, instances):
+    """
+    Delete an instance entity from the datastore.
+
+    :param gce_project: The string name of the project owning the resources.
+    :param lab: The lab ndb entity that the instances belong to.
+    :param instances: A list containing the instance ndb entities to be amended.
+    """
+
+    for instance in instances:
+        instance.key.delete()
 
 
 app = webapp2.WSGIApplication(
     [
         ('/', Main),
-        ('/lab/new', CreateLab),
+        ('/lab/new', CreateNewLab),
         ('/lab/(\d+)', LabDetails),
         ('/lab/get-status', GetInstanceStatus),
-        ('/lab/stop-instance', StopInstance)
+        ('/lab/activity-handler', InstanceService)
     ],
     debug=True)

@@ -19,19 +19,20 @@
                 for(var i=0; i<data.length; i++){
                     var state = data[i].state;
                     var button;
-                    //var bin;
+                    var bin;
 
                     if (state == "REQUEST PENDING") {
                         labButton = false
                     }
 
                     if (state == "RUNNING" || state == "PROVISIONING" || state == "STAGING" || state == "ERROR STOPPING INSTANCE") {
-                        button = '<a id="'+data[i].name+'_button"; title="Click to stop instance" href="#" onclick="stopInstance(&#34;'+data[i].name+'&#34;, &#34;'+data[i].id+'&#34;);return false;" class="btn btn-danger" >Stop Instance</a>';
+                        button = '<a title="Click to stop instance" href="#" onclick="stopInstance(&#34;'+data[i].id+'&#34;);return false;" class="btn btn-danger" >Stop Instance</a>';
                         labButtonOption = (labButtonOption & false);
                     } else if (state == "REQUEST PENDING" || state == "STOPPING") {
                         button = '<a href="#" class="btn btn-default disabled" >Please wait...</a>';
                     } else if (state == "TERMINATED" || state == "ERROR STARTING INSTANCE") {
-                        button = '<a href="#" class="btn btn-success" >Start Instance</a>';
+                        button = '<a href="#" onclick="startInstance(&#34;'+data[i].id+'&#34;);return false;" class="btn btn-success" >Start Instance</a>';
+                        bin = '<a href="#" onclick="deleteInstance(&#34;'+data[i].id+'&#34;);return false;" class="btn btn-default" > <span class="glyphicon glyphicon-trash"></span></a>';
                         labButtonOption = (labButtonOption & true);
                     }
 
@@ -41,6 +42,7 @@
                     content += '<td>'+data[i].name+'</td>';
                     content += '<td>'+data[i].pass+'</td>';
                     content += '<td>'+button+'</td>';
+                    content += '<td>'+bin+'</td>';
                     content += '</tr>';
                 }
                 $('#instance-table tbody').html(content);
@@ -52,7 +54,7 @@
                 } else {
                     if (labButtonOption == true) {
                         $('#lab-control-button').attr('class', 'btn btn-success');
-                        $('#lab-control-button').attr('href', '#');
+                        $('#lab-control-button').attr('href', 'javascript:startLab();');
                         $('#lab-control-button').html('Start lab');
                     } else {
                         $('#lab-control-button').attr('class', 'btn btn-danger');
@@ -71,31 +73,78 @@
             setInterval( "getInstanceData()", 10000);
         });
 
-        function stopInstance(instanceName, instanceID){
-            $('#'+instanceName+'_button').attr('disabled', true);
+        function startInstance(instanceID){
 
             $.ajax({
                 type: "POST",
-                url: "/lab/stop-instance",
+                url: "/lab/activity-handler",
                 dataType: 'json',
                 data: JSON.stringify({ "lab_id": {{lab_id}},
-                                       "option": "single",
-                                       "instance_name": instanceName,
-                                       "instance_id": instanceID})
+                                       "target_function": "START",
+                                       "target_instances": [instanceID]})
             })
             .done(function( data ) {
                 getInstanceData();
             });
         };
 
+        function stopInstance(instanceID){
+
+            $.ajax({
+                type: "POST",
+                url: "/lab/activity-handler",
+                dataType: 'json',
+                data: JSON.stringify({ "lab_id": {{lab_id}},
+                                       "target_function": "STOP",
+                                       "target_instances": [instanceID]})
+            })
+            .done(function( data ) {
+                getInstanceData();
+            });
+        };
+
+        function deleteInstance(instanceID){
+
+            $.ajax({
+                type: "POST",
+                url: "/lab/activity-handler",
+                dataType: 'json',
+                data: JSON.stringify({ "lab_id": {{lab_id}},
+                                       "target_function": "DELETE",
+                                       "target_instances": [instanceID]})
+            })
+            .done(function( data ) {
+                getInstanceData();
+            });
+        };
+
+
+
         function stopLab(){
             $(this).attr("disabled", "disabled");
             $.ajax({
                 type: "POST",
-                url: "/lab/stop-instance",
+                url: "/lab/activity-handler",
                 dataType: 'json',
                 data: JSON.stringify({ "lab_id": {{lab_id}},
-                                       "option": "all"
+                                       "target_function": "STOP",
+                                       "target_instances": "ALL"
+                                       })
+            })
+            .done(function( data ) {
+                getInstanceData();
+            });
+        };
+
+        function startLab(){
+            $(this).attr("disabled", "disabled");
+            $.ajax({
+                type: "POST",
+                url: "/lab/activity-handler",
+                dataType: 'json',
+                data: JSON.stringify({ "lab_id": {{lab_id}},
+                                       "target_function": "START",
+                                       "target_instances": "ALL"
                                        })
             })
             .done(function( data ) {
@@ -110,19 +159,30 @@
 {% endblock %}
 
 {% block content %}
+
+
     <h1 id="header">Lab: {{lab_name}}</h1>
+    <div class="row">
+        <div class="col-md-8"></div>
+        <div class="col-md-4" bottom="0px">
+            <span class="pull-right">
+                <a href="#" id="lab-control-button" class="btn btn-default disabled" >Pending</a>
+                <button type="button" class="btn btn-default" href="#">
+                    <span class="glyphicon glyphicon-cog"></span>
+                </button>
+            </span>
+        </div>
+    </div>
     <hr>
-
-    <a href="#" id="lab-control-button" class="btn btn-default disabled" >Pending</a>
-
     <table class="table" id="instance-table">
       <thead>
         <tr>
           <th class="col-sm-3">IP Address</th>
           <th class="col-sm-3">Status</th>
           <th class="col-sm-3">Username</th>
-          <th class="col-sm-3">Password</th>
+          <th class="col-sm-2">Password</th>
           <th class="col-sm-3">Stop/Start</th>
+          <th class="col-sm-3">Delete</th>
         </tr>
       </thead>
         <tbody>

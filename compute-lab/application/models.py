@@ -7,6 +7,8 @@ class Lab(ndb.Model):
     name = ndb.StringProperty()
     project_id = ndb.StringProperty()
     lab_zone = ndb.StringProperty()
+    machine_type = ndb.StringProperty()
+    instance_image = ndb.StringProperty()
 
 class Instance(ndb.Model):
     """Data model to record instances"""
@@ -14,3 +16,4 @@ class Instance(ndb.Model):
     lab = ndb.KeyProperty(kind=Lab)
     desired_state = ndb.StringProperty()
     request_timestamp = ndb.DateTimeProperty()
+    metadata = ndb.JsonProperty()
